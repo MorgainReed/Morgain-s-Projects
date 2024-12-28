@@ -35,6 +35,7 @@ ORDER BY sales.customer_id ASC;
 - We must aggregate the prices of all menu items each customer has bought to get the sum of their spending.
 - Insert an ORDER BY to make this more logical to read.
 
+
 ## 2. How many days has each customer visited the restaurant?
 ````sql
 SELECT 
@@ -54,8 +55,7 @@ ORDER BY sales.customer_id ASC;
 
 **Process**
 - For each customer we want to know how many unique days they have visited, so we must use both **COUNT** and **DISTINCT**, in order to not count any visits on the same day twice.
-
-
+- Grouping this is crutial as we do not want a **COUNT** for each entry in the sales table.
 
 ## 3. What was the first item from the menu purchased by each customers
 ````sql
@@ -91,11 +91,90 @@ ORDER BY s.customer_id ASC;
 - The main query joins this subquery to the sales table **AND** filters this to only the dates matching the earliest order date.
 - We then want this to be easily readable, so there is a second **JOIN** to find the name of the product from the menu table using the product_id from the sales table.
 - We then group by the customer_id and product_name so we only get one answer per customer on their earliest order date.
-**We get two rows for customer A as they have ordered both the curry ans sushi on their first date of purchase. The order_date column in the sales table is not a timestamp, only a date, so we cannot conclude that either one of these was the first order, so we must leave both in as both answers are correct.**
+**We get two rows for customer A as they have ordered both the curry and the sushi on their first date of purchase. The order_date column in the sales table is not a timestamp, only a date, so we cannot conclude that either one of these was the first order, therefore we leave both in as both are correct.**
 
 
 ## 4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+````SQL
+SELECT
+  menu.product_name
+  ,COUNT(sales.product_id)
+ FROM sales
+ JOIN menu
+ ON menu.product_id = sales.product_id
+ GROUP BY menu.product_name
+ ORDER BY COUNT(sales.product_id) DESC
+ LIMIT 1
+````
+**Result**
+| product_name | times_purchased |
+| ------------ | --------------- |
+|      ramen   |    8            |
+
+**Process**
+- Firstly, we know that only two columns and one row are needed here: the most popular product and how many times it has been purchased, so we only need select the product name and an aggregate function to count the purchase times of each product.
+- We need to make this easy to read, so we will join the menu and the sales table to get the name of the product instead of the product_id.
+- To easily find the most purchased item, we can order our result descending by the count of purchases and then use **LIMIT** to restrict the reult to just the first row of results, giving us the most purchased item.
+
+
 ## 6. Which item was the most popular for each customer?
+MY FIRST ATTEMPT: 
+````SQL
+SELECT
+   sales.customer_id,
+   menu.product_name,
+   COUNT(sales.product_id) AS times_purchased
+ FROM sales
+ JOIN menu
+ ON sales.product_id = menu.product_id
+ GROUP BY 
+   sales.customer_id,
+   menu.product_name
+ ORDER BY times_purchased DESC
+ LIMIT 3;
+````
+- I tend to like to start simple with my queries, look at the data, and then make the query more complex if it is needed. Here, my simplistic thinking is not going to cut it, as 1. cutomers may have more than one favorite item, and 2. one customer may come more frequently than another, resulting in a higher purchase count, therefore if I simply order by 'times_purchased' and limit the results to 3, I could come back with just the top 3 dishes purchased by one customer! We need to write a more complex query that will find customers' favorites more dynamically. We will use a **CTE** and the **DENSE RANK() Window Function** for this.
+
+
+````SQL
+WITH ranked_favorites AS (
+  SELECT
+     sales.customer_id,
+     menu.product_name,
+     COUNT(sales.product_id) AS times_purchased,
+   	DENSE_RANK() OVER (
+    PARTITION BY sales.customer_id
+    ORDER BY COUNT(sales.product_id) DESC) AS ranks
+ FROM menu
+ JOIN sales
+ ON menu.product_id = sales.product_id
+ GROUP BY 
+   sales.customer_id,
+   menu.product_name
+)
+
+  SELECT
+     customer_id,
+     product_name,
+     times_purchased 
+  FROM ranked_favorites
+  WHERE ranks = 1;
+````
+**Result**
+| customer_id | product_name  |  times_purchased |
+| ------------| ------------- | -----------------|
+|     A       |    ramen      |    3             |
+|     B       |    ramen      |    2             |
+|     B       |    curry      |    2             |
+|     B       |    sushi      |    2             |
+|     C       |    ramen      |    3             |
+
+**Process**
+- Here, the CTE joined the tables menu and sales to give us the columns we need, then groups by customer_id and product_name, to return a table with the customer, the products they 
+  bought, and a count of how many times they bought these items.
+- The Window Function **DENSE RANK()** then assigns a rank to each item based on the number of times it was bought, and **PARTITION BY** allows these ranks to be assigned per customer, instead of over the whole data set.
+- It is worth noting that I chose **DENSE RANK()** as it allows for ties, where **RANK()** does not, which is important as customer B has 3 favorite items!
+
 ## 7. Which item was purchased first by the customer after they became a member?
 ## 8. Which item was purchased just before the customer became a member?
 ## 9. What is the total items and amount spent for each member before they became a member?
