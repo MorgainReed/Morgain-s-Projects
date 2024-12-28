@@ -117,7 +117,7 @@ SELECT
 - To easily find the most purchased item, we can order our result descending by the count of purchases and then use **LIMIT** to restrict the reult to just the first row of results, giving us the most purchased item.
 
 
-## 6. Which item was the most popular for each customer?
+## 5. Which item was the most popular for each customer?
 MY FIRST ATTEMPT: 
 ````SQL
 SELECT
@@ -175,12 +175,41 @@ WITH ranked_favorites AS (
 - The Window Function **DENSE RANK()** then assigns a rank to each item based on the number of times it was bought, and **PARTITION BY** allows these ranks to be assigned per customer, instead of over the whole data set.
 - It is worth noting that I chose **DENSE RANK()** as it allows for ties, where **RANK()** does not, which is important as customer B has 3 favorite items!
 
-## 7. Which item was purchased first by the customer after they became a member?
-## 8. Which item was purchased just before the customer became a member?
-## 9. What is the total items and amount spent for each member before they became a member?
-## 10. If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
-## 11. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+## 6. Which item was purchased first by the customer after they became a member?
+````SQL
+  WITH member_value AS (
+  SELECT
+  	members.customer_id,
+        sales.product_id,
+        ROW_NUMBER() OVER (
+	      PARTITION BY members.customer_id
+	      ORDER BY sales.order_date)
+        AS member_row
+  FROM dannys_diner.members
+  INNER JOIN dannys_diner.sales
+    ON members.customer_id = sales.customer_id
+    AND members.join_date > sales.order_date
+    )
+ 
+ SELECT 
+    member_value.customer_id,
+    menu.product_name
+ FROM member_value
+ JOIN dannys_diner.menu
+ ON member_value.product_id = menu.product_id
+ WHERE member_row = 1;
+````
+**Result**
+| customer_id | product_name  | 
+| ------------| ------------- |
+|     A       |    sushi      | 
+|     B       |    curry      | 
 
+
+**Process**
+- Here, our CTE is selecting the columns we need and then joining the sales table with the members table, grabbing only the sales made after the customer has become a member.
+- The Window Function **Row_Number()** finds the row number of each purchase, partitioned by the customer_id and ordered by sale date, which then allows us to later find the purchases made only after the customer becomes a member.
+- The outer query grabs the customer_id and product_id, joining the CTE and the menu tables to return product_id, and then the WHERE statement filters for only the first purchase after the customer becomes a memeber.
 
 
 
