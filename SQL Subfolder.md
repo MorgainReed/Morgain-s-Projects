@@ -188,7 +188,7 @@ WITH ranked_favorites AS (
   FROM dannys_diner.members
   INNER JOIN dannys_diner.sales
     ON members.customer_id = sales.customer_id
-    AND members.join_date > sales.order_date
+    AND members.join_date < sales.order_date
     )
  
  SELECT 
@@ -211,9 +211,77 @@ WITH ranked_favorites AS (
 - The Window Function **Row_Number()** finds the row number of each purchase, partitioned by the customer_id and ordered by sale date, which then allows us to later find the purchases made only after the customer becomes a member.
 - The outer query grabs the customer_id and product_id, joining the CTE and the menu tables to return product_id, and then the WHERE statement filters for only the first purchase after the customer becomes a memeber.
 
+## 7. Which item was purchased just before the customer became a member?
+````SQL
+WITH purchase_before_member AS (
+  SELECT
+	members.customer_id,
+        sales.product_id,
+        ROW_NUMBER() OVER (
+	      PARTITION BY members.customer_id
+	      ORDER BY sales.order_date DESC)
+        AS desc_purchase_rank
+  FROM dannys_diner.members
+  INNER JOIN dannys_diner.sales
+    ON members.customer_id = sales.customer_id
+    AND members.join_date > sales.order_date
+    )
+ 
+ SELECT 
+    purchase_before_member.customer_id,
+    menu.product_name
+ FROM purchase_before_member
+ JOIN dannys_diner.menu
+ ON purchase_before_member.product_id = menu.product_id
+ WHERE desc_purchase_rank = 1;
+````
+**Result**
+| customer_id | product_name  | 
+| ------------| ------------- |
+|     B       |    sushi      | 
+|     A       |    sushi      | 
 
+. Both customer A and B bought sushi before they joined as members.
 
+**Process**
+- This query is very similar to query #6, so the process is nearly the same, but we are looking for the purchases made before the member join date instead of after.
+- Here, our CTE is selecting the columns we need and then joining the sales table with the members table, grabbing only the sales made before the customer has become a member.
+- The Window Function **Row_Number()** finds the row number of each purchase, partitioned by the customer_id and in descending order by date so at the top of our list (i.e. rank #1) will be the last purchase before the customer was converted to a member.
+- The outer query grabs the customer_id and product_id, joining the CTE and the menu tables to return product_id, and then the WHERE statement filters for only the first purchase before the customer becomes a memeber.
 
+## 7. Which item was purchased just before the customer became a member?
+````SQL
+SELECT
+   sales.customer_id
+  ,COUNT(menu.product_name) AS total_items
+  ,SUM(menu.price) AS total_spent
+
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.members
+   ON   sales.customer_id = members.customer_id
+   AND  sales.order_date < members.join_date
+
+INNER JOIN dannys_diner.menu
+   ON sales.product_id = menu.product_id
+
+GROUP BY sales.customer_id
+ORDER BY sales.customer_id;
+````
+**Result**
+| customer_id | total_items | total_spent |
+| ------------| ----------- | ----------- |
+|     A       |      2      |      25     |
+|     B       |      3      |      40     |
+
+. Customer A bought two items totaling $25 before becoming a member.
+.  Customer B bought 3 items totaling $40 before becoming a member.
+
+**Process**
+- Select the columns we need, which here is just the customer ID, count of the total items each customer bought, and the total they spent. We use simple aggregate functions **COUNT** and **SUM** here to accomplish this.
+- We then need to filter down to only purchases made before the customer joined as a member. In order to do this, we join the members table with the sales table on customer_id and ensure the purchase date returned is before thier membership join date.
+- In order to return values from the menu table, we also need to join the sales table and menu table based on product_id.
+- We then want to group and order by customer_id to get the summarized table which is out end product.
+ 
 
 
 
