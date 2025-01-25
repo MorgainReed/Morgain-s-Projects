@@ -255,7 +255,7 @@ WITH purchase_before_member AS (
   converted to a member.
 - The outer query grabs the customer_id and product_id, joining the CTE and the menu tables to return product_id, and then the WHERE statement filters for only the first purchase before the customer becomes a memeber.
 
-## 7. Which item was purchased just before the customer became a member?
+## 8. What is the total items and amount spent for each member before they became a member?
 ````SQL
 SELECT
    sales.customer_id
