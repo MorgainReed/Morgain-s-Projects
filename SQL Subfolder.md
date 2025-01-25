@@ -133,7 +133,7 @@ SELECT
  ORDER BY times_purchased DESC
  LIMIT 3;
 ````
-- I tend to like to start simple with my queries, look at the data, and then make the query more complex if it is needed. Here, my simplistic thinking is not going to cut it, as 1. cutomers may have more than one favorite item, and 2. one customer may come more frequently than another, resulting in a higher purchase count, therefore if I simply order by 'times_purchased' and limit the results to 3, I could come back with just the top 3 dishes purchased by one customer! We need to write a more complex query that will find customers' favorites more dynamically. We will use a **CTE** and the **DENSE RANK() Window Function** for this.
+- I tend to like to start simple with my queries, look at the data, and then make the query more complex if it is needed. Here, my simplistic thinking is not going to cut it, as 1. Customers may have more than one favorite item, and 2. One customer may come more frequently than another, resulting in a higher purchase count, therefore if I simply order by 'times_purchased' and limit the results to 3, I could come back with just the top 3 dishes purchased by one customer! We need to write a more complex query that will find customers' favorites more dynamically. We will use a **CTE** and the **DENSE RANK() Window Function** for this.
 
 
 ````SQL
@@ -205,7 +205,9 @@ WITH ranked_favorites AS (
 |     A       |    sushi      | 
 |     B       |    curry      | 
 
-
+- Cusomer A purchased sushi right after becoming a member.
+- Customer B purchased curry right after becoming a member.
+  
 **Process**
 - Here, our CTE is selecting the columns we need and then joining the sales table with the members table, grabbing only the sales made after the customer has become a member.
 - The Window Function **Row_Number()** finds the row number of each purchase, partitioned by the customer_id and ordered by sale date, which then allows us to later find the purchases made only after the customer becomes a member.
@@ -241,7 +243,7 @@ WITH purchase_before_member AS (
 |     B       |    sushi      | 
 |     A       |    sushi      | 
 
-. Both customer A and B bought sushi before they joined as members.
+- Both customer A and B bought sushi before they joined as members.
 
 **Process**
 - This query is very similar to query #6, so the process is nearly the same, but we are looking for the purchases made before the member join date instead of after.
@@ -273,8 +275,8 @@ ORDER BY sales.customer_id;
 |     A       |      2      |      25     |
 |     B       |      3      |      40     |
 
-. Customer A bought two items totaling $25 before becoming a member.
-.  Customer B bought 3 items totaling $40 before becoming a member.
+- Customer A bought two items totaling $25 before becoming a member.
+-  Customer B bought 3 items totaling $40 before becoming a member.
 
 **Process**
 - Select the columns we need, which here is just the customer ID, count of the total items each customer bought, and the total they spent. We use simple aggregate functions **COUNT** and **SUM** here to accomplish this.
@@ -282,7 +284,42 @@ ORDER BY sales.customer_id;
 - In order to return values from the menu table, we also need to join the sales table and menu table based on product_id.
 - We then want to group and order by customer_id to get the summarized table which is out end product.
  
+## 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+````SQL
+WITH points_table AS (
+SELECT 
+	 menu.product_id
+    ,CASE 
+     WHEN menu.product_name = 'sushi' THEN menu.price * 20
+  	 ELSE menu.price * 10 
+     END
+  	 AS points
+ FROM dannys_diner.menu
+  )
+  
+ SELECT 
+  	sales.customer_id
+  	,sum(points_table.points)
+ FROM points_table
+ INNER JOIN dannys_diner.sales
+   ON sales.product_id = points_table.product_id
+ GROUP BY sales.customer_id
+ ORDER BY sales.customer_id;
+````
 
+**Result**
+| customer_id |   points  |
+| ------------| --------- |
+|     A       |    860    |
+|     B       |    940    |
+|     C       |    360    |
 
+- Customer A has 860 points.
+- Customer B has 940 points.
+- Customer C has 360 points.
+
+**Process**
+- First, lets create a CTE for points so that we can easily query this to sum up how many points each customer has collected. It is important to remember that we must use a 2x multiplier for sushi only, so we use a **CASE WHEN** statement for this. 
+- Next, we 
 
    
