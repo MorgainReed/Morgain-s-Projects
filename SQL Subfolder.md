@@ -112,7 +112,8 @@ SELECT
 |      ramen   |    8            |
 
 **Process**
-- Firstly, we know that only two columns and one row are needed here: the most popular product and how many times it has been purchased, so we only need select the product name and an aggregate function to count the purchase times of each product.
+- Firstly, we know that only two columns and one row are needed here: the most popular product and how many times it has been purchased, so we only need select the product name and an aggregate function to count the purchase times of 
+  each product.
 - We need to make this easy to read, so we will join the menu and the sales table to get the name of the product instead of the product_id.
 - To easily find the most purchased item, we can order our result descending by the count of purchases and then use **LIMIT** to restrict the reult to just the first row of results, giving us the most purchased item.
 
@@ -133,7 +134,9 @@ SELECT
  ORDER BY times_purchased DESC
  LIMIT 3;
 ````
-- I tend to like to start simple with my queries, look at the data, and then make the query more complex if it is needed. Here, my simplistic thinking is not going to cut it, as 1. Customers may have more than one favorite item, and 2. One customer may come more frequently than another, resulting in a higher purchase count, therefore if I simply order by 'times_purchased' and limit the results to 3, I could come back with just the top 3 dishes purchased by one customer! We need to write a more complex query that will find customers' favorites more dynamically. We will use a **CTE** and the **DENSE RANK() Window Function** for this.
+- I tend to like to start simple with my queries, look at the data, and then make the query more complex if it is needed. Here, my simplistic thinking is not going to cut it, as 1. Customers may have more than one favorite item, and 2. 
+  One customer may come more frequently than another, resulting in a higher purchase count, therefore if I simply order by 'times_purchased' and limit the results to 3, I could come back with just the top 3 dishes purchased by one 
+  customer! We need to write a more complex query that will find customers' favorites more dynamically. We will use a **CTE** and the **DENSE RANK() Window Function** for this.
 
 
 ````SQL
@@ -248,7 +251,8 @@ WITH purchase_before_member AS (
 **Process**
 - This query is very similar to query #6, so the process is nearly the same, but we are looking for the purchases made before the member join date instead of after.
 - Here, our CTE is selecting the columns we need and then joining the sales table with the members table, grabbing only the sales made before the customer has become a member.
-- The Window Function **Row_Number()** finds the row number of each purchase, partitioned by the customer_id and in descending order by date so at the top of our list (i.e. rank #1) will be the last purchase before the customer was converted to a member.
+- The Window Function **Row_Number()** finds the row number of each purchase, partitioned by the customer_id and in descending order by date so at the top of our list (i.e. rank #1) will be the last purchase before the customer was 
+  converted to a member.
 - The outer query grabs the customer_id and product_id, joining the CTE and the menu tables to return product_id, and then the WHERE statement filters for only the first purchase before the customer becomes a memeber.
 
 ## 7. Which item was purchased just before the customer became a member?
@@ -280,7 +284,8 @@ ORDER BY sales.customer_id;
 
 **Process**
 - Select the columns we need, which here is just the customer ID, count of the total items each customer bought, and the total they spent. We use simple aggregate functions **COUNT** and **SUM** here to accomplish this.
-- We then need to filter down to only purchases made before the customer joined as a member. In order to do this, we join the members table with the sales table on customer_id and ensure the purchase date returned is before thier membership join date.
+- We then need to filter down to only purchases made before the customer joined as a member. In order to do this, we join the members table with the sales table on customer_id and ensure the purchase date returned is before thier 
+  membership join date.
 - In order to return values from the menu table, we also need to join the sales table and menu table based on product_id.
 - We then want to group and order by customer_id to get the summarized table which is out end product.
  
@@ -288,21 +293,23 @@ ORDER BY sales.customer_id;
 ````SQL
 WITH points_table AS (
 SELECT 
-	 menu.product_id
+     menu.product_id
     ,CASE 
      WHEN menu.product_name = 'sushi' THEN menu.price * 20
-  	 ELSE menu.price * 10 
+     ELSE menu.price * 10 
      END
   	 AS points
  FROM dannys_diner.menu
-  )
+ )
   
  SELECT 
   	sales.customer_id
   	,sum(points_table.points)
  FROM points_table
+
  INNER JOIN dannys_diner.sales
    ON sales.product_id = points_table.product_id
+
  GROUP BY sales.customer_id
  ORDER BY sales.customer_id;
 ````
@@ -319,7 +326,72 @@ SELECT
 - Customer C has 360 points.
 
 **Process**
-- First, lets create a CTE for points so that we can easily query this to sum up how many points each customer has collected. It is important to remember that we must use a 2x multiplier for sushi only, so we use a **CASE WHEN** statement for this. 
-- Next, we 
+- First, lets create a CTE for points to sum up how many points each customer has collected. It is important to remember that we must use the 2x multiplier for sushi only, so we use a **CASE WHEN** statement for this. 
+- Next, we just need the customer_id and the sum of points associated with each customer, so we select these columns, join the sales table and points_table based on product_id, and group by customer_id.
+- We then order by customer_id for readability, and get our results table.
+
+## 10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+````SQL
+WITH time_period AS (
+  SELECT
+     members.customer_id
+    ,members.join_date
+    ,members.join_date + 6 as first_week_ends
+    ,DATE_TRUNC ('month', '2021-1-31'::DATE)
+  		+ INTERVAL '1 month'
+  		- INTERVAL '1 day' AS last_jan_date
+  
+   FROM dannys_diner.members
+   )
+ 
+ SELECT
+ 	sales.customer_id
+    ,SUM(CASE 
+         WHEN menu.product_name = 'sushi' THEN menu.price * 20
+         WHEN sales.order_date BETWEEN time_period.join_date
+			       AND time_period.first_week_ends
+			       THEN menu.price * 20
+         ELSE menu.price * 10
+         END) AS points
+  FROM dannys_diner.sales
+  
+  INNER JOIN time_period
+    ON sales.customer_id = time_period.customer_id
+    AND sales.order_date >= time_period.join_date
+    AND sales.order_date <= time_period.last_jan_date
+  
+  INNER JOIN dannys_diner.menu
+  	ON sales.product_id = menu.product_id
+  
+  GROUP BY sales.customer_id
+  ORDER BY sales.customer_id;
+  ````
+**Result**
+| customer_id |   points  |
+| ------------| --------- |
+|     A       |    1020   |
+|     B       |    320    |
+
+- Customer A collected 1020 points in January.
+- Customer B collected 320 points in January.
+
+**Process**
+- First, we have a specific time period to look at, so we should create a CTE for these dates. We do this by selecting customer_ID, their join date, adding 6 days to their join date to get the last day of the 'double 
+  points period', and then use the DATE_TRUNC window function to find and return the last day of January 2021. This completes the dates we need and therefore what we need in our time_period CTE.
+- Next, we select customer_id and the sum of the points these customers have collected. We need to specify how many points are collected in certain cases, so we use CASE WHEN to define these. We must define that sushi always gets 
+  double points, everything gets double points during the first week of membership, and outside of that first week of membership, everything but sushi gets 1x points.
+- We then have to join our tables to filter down results. The first join puts together the sales table and the time_period CTE based on customer_id, sales.order_date must be greater than or equal to the member's join_date, and less 
+  than or equal to the last day of January.
+- We then join the sales table to the menu based on product_id so that we can use the price column to calculate points, as we did in the CASE WHEN statement.
+- Finally, we group and order by customer_id to return the sum of points and maximize readability of the table.
+
+
+
+
+
+
+
+
+
 
    
