@@ -284,10 +284,10 @@ ORDER BY sales.customer_id;
 
 **Process**
 - Select the columns we need, which here is just the customer ID, count of the total items each customer bought, and the total they spent. We use simple aggregate functions **COUNT** and **SUM** here to accomplish this.
-- We then need to filter down to only purchases made before the customer joined as a member. In order to do this, we join the members table with the sales table on customer_id and ensure the purchase date returned is before thier 
+- We then need to filter down to only purchases made before the customer joined as a member. In order to do this, we join the members table with the sales table on customer_id and ensure the purchase date returned is before their 
   membership join date.
 - In order to return values from the menu table, we also need to join the sales table and menu table based on product_id.
-- We then want to group and order by customer_id to get the summarized table which is out end product.
+- We then want to group and order by customer_id to get the summarized table which is our end product.
  
 ## 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
 ````SQL
@@ -345,7 +345,7 @@ WITH time_period AS (
    )
  
  SELECT
- 	sales.customer_id
+     sales.customer_id
     ,SUM(CASE 
          WHEN menu.product_name = 'sushi' THEN menu.price * 20
          WHEN sales.order_date BETWEEN time_period.join_date
